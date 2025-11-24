@@ -5,11 +5,6 @@
   <title>Iceberg 3D – Custom Print Quote v2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- three.js -->
-  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
-  <script src="https://unpkg.com/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://unpkg.com/three@0.152.2/examples/js/loaders/STLLoader.js"></script>
-
   <style>
     * { box-sizing: border-box; }
 
@@ -192,10 +187,6 @@
       font-size: 12px;
     }
 
-    input[type="range"] {
-      width: 100%;
-    }
-
     .checkbox-row {
       display: flex;
       align-items: center;
@@ -263,62 +254,7 @@
       to { transform: rotate(360deg); }
     }
 
-    /* Preview side */
-    .preview-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .preview-area {
-      position: relative;
-      border-radius: 18px;
-      border: 1px solid #e5e7eb;
-      background: radial-gradient(circle at top, #dbeafe 0, #eff6ff 36%, #f9fafb 100%);
-      height: 260px;
-      overflow: hidden;
-    }
-
-    #preview-canvas {
-      width: 100%;
-      height: 100%;
-    }
-
-    .preview-empty,
-    .preview-loading {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      gap: 6px;
-      font-size: 13px;
-      color: #6b7280;
-    }
-
-    .preview-loading {
-      background: radial-gradient(circle at top, rgba(191,219,254,0.6), rgba(255,255,255,0.9));
-      backdrop-filter: blur(4px);
-    }
-
-    .preview-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: #6b7280;
-      padding: 4px 4px 0;
-    }
-
-    .tag {
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid #d1d5db;
-      background: white;
-      font-size: 11px;
-      color: #374151;
-    }
-
+    /* Quote side */
     .quote-box {
       border-radius: 18px;
       border: 1px solid #e5e7eb;
@@ -362,7 +298,7 @@
       <div class="header">
         <div class="title-block">
           <h1>Iceberg 3D – Custom Printing Quote</h1>
-          <p>Upload your 3D model, pick your settings, and we’ll generate a detailed quote.</p>
+          <p>Upload your STL, pick your settings, and we’ll generate a clear price using our published rule set.</p>
         </div>
         <div class="badge">v2 · Internal Beta</div>
       </div>
@@ -376,16 +312,16 @@
                 <span class="icon">①</span>
                 Project &amp; Print Settings
               </div>
-              <div class="card-sub">Tell us what you’re printing – we’ll use this to calculate time &amp; material.</div>
+              <div class="card-sub">Upload STL, choose material/colour/layer height, then calculate price.</div>
             </div>
           </div>
 
           <div class="field field-file">
             <label>
               3D model file
-              <small>Supported: STL, 3MF, OBJ (preview for STL only)</small>
+              <small>STL only · Preview disabled (pricing only)</small>
             </label>
-            <input id="file" type="file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ" />
+            <input id="file" type="file" accept=".stl,.STL" />
             <div class="hint">If you have multiple parts, please zip them and upload as one file – we’ll treat this as one project.</div>
           </div>
 
@@ -393,13 +329,17 @@
             <div class="field">
               <label>
                 Material
-                <small>PLA / PETG priced for standard jobs</small>
+                <small>Uses published multipliers</small>
               </label>
               <select id="material">
-                <option value="PLA" selected>PLA (standard)</option>
-                <option value="PETG">PETG (stronger)</option>
-                <option value="ASA">ASA (outdoor)</option>
-                <option value="TPU">TPU (flexible)</option>
+                <option value="PLA" selected>PLA (1.0x baseline)</option>
+                <option value="PETG">PETG (1.25x)</option>
+                <option value="TPU">TPU (1.35x)</option>
+                <option value="PLA-CF">PLA-CF (1.45x)</option>
+                <option value="PETG-CF">PETG-CF (1.45x)</option>
+                <option value="ASA">ASA (1.4x)</option>
+                <option value="ABS">ABS (1.4x)</option>
+                <option value="PC/PA">PC / PA (1.8x)</option>
               </select>
             </div>
 
@@ -409,32 +349,40 @@
                 <small>Smaller = finer detail</small>
               </label>
               <select id="layer_height">
-                <option value="0.12">0.12 mm – Fine</option>
-                <option value="0.16" selected>0.16 mm – Balanced</option>
-                <option value="0.20">0.20 mm – Standard</option>
-                <option value="0.28">0.28 mm – Draft</option>
+                <option value="0.28">0.28 mm – Quick (0.85x)</option>
+                <option value="0.20" selected>0.20 mm – Standard (1.0x)</option>
+                <option value="0.12">0.12 mm – High detail (1.4x)</option>
+                <option value="0.08">0.08 mm – Ultra fine (1.8x)</option>
               </select>
             </div>
 
             <div class="field">
               <label>
-                Infill
-                <small id="infill-label">20%</small>
+                Colour
+                <small>Black/White no surcharge</small>
               </label>
-              <input id="infill" type="range" min="10" max="100" step="5" value="20" />
+              <select id="colour">
+                <option value="basic" selected>Black / White (£0)</option>
+                <option value="standard">Standard colours (+£1.50)</option>
+                <option value="metallic">Metallic / Silk (+£3.00)</option>
+                <option value="custom">Special-order colour (+£4.00 est.)</option>
+              </select>
             </div>
 
             <div class="field">
               <label>
-                Quantity
+                Estimated weight (g)
+                <small>Enter slicer-estimated weight</small>
               </label>
-              <input id="quantity" type="number" min="1" value="1" />
+              <input id="weight" type="number" min="1" value="50" />
             </div>
           </div>
 
-          <div class="checkbox-row">
-            <input id="rush" type="checkbox" />
-            <label for="rush">Rush order (we’ll prioritise this job, surcharge applies)</label>
+          <div class="field" style="margin-top: 8px;">
+            <label>
+              Quantity
+            </label>
+            <input id="quantity" type="number" min="1" value="1" />
           </div>
 
           <div class="field-grid" style="margin-top: 8px;">
@@ -450,7 +398,7 @@
 
           <div class="field" style="margin-top: 6px;">
             <label>Notes for Iceberg team (optional)</label>
-            <textarea id="notes" placeholder="Tell us about colour preferences, use case, deadlines, or anything special."></textarea>
+            <textarea id="notes" placeholder="Tell us about deadlines, tolerances, colour requests, or anything special."></textarea>
           </div>
 
           <div id="form-error" class="error"></div>
@@ -463,37 +411,20 @@
           </div>
         </div>
 
-        <!-- RIGHT: PREVIEW + QUOTE -->
-        <div class="preview-wrapper">
-          <div class="card">
+        <!-- RIGHT: QUOTE -->
+        <div class="quote-wrapper">
+          <div class="card" style="min-height:120px;">
             <div class="card-header">
               <div>
                 <div class="card-title">
                   <span class="icon">②</span>
-                  Model preview
+                  Quote summary
                 </div>
-                <div class="card-sub">Rotate, pan and zoom – for STL files only. Other formats are still printable.</div>
+                <div class="card-sub">Upload your file and settings, then click “Get quote” to see pricing here. Preview has been temporarily disabled.</div>
               </div>
             </div>
 
-            <div class="preview-area">
-              <div id="preview-canvas"></div>
-              <div id="preview-empty" class="preview-empty">
-                <div>No model loaded yet</div>
-                <div class="hint">Upload an STL file to see an interactive preview.</div>
-              </div>
-              <div id="preview-loading" class="preview-loading" style="display:none;">
-                <div class="spinner" style="border-color:rgba(37,99,235,0.25);border-top-color:#2563eb;"></div>
-                <div>Processing model…</div>
-              </div>
-            </div>
-            <div id="preview-meta" class="preview-meta" style="display:none;">
-              <div><span class="tag" id="preview-filename">—</span></div>
-              <div id="preview-size">—</div>
-            </div>
-          </div>
-
-          <div class="quote-box">
+            <div class="quote-box">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
               <div style="font-weight:600;font-size:13px;">Quote summary</div>
               <div style="font-size:11px;color:#9ca3af;">Prices are indicative – confirmed upon order.</div>
@@ -517,24 +448,16 @@
                 <div class="quote-value" id="qr-material">—</div>
               </div>
               <div class="quote-row">
+                <div class="quote-label">Colour</div>
+                <div class="quote-value" id="qr-colour">—</div>
+              </div>
+              <div class="quote-row">
+                <div class="quote-label">Weight</div>
+                <div class="quote-value" id="qr-weight">—</div>
+              </div>
+              <div class="quote-row">
                 <div class="quote-label">Layer height</div>
                 <div class="quote-value" id="qr-layer">—</div>
-              </div>
-              <div class="quote-row">
-                <div class="quote-label">Infill</div>
-                <div class="quote-value" id="qr-infill">—</div>
-              </div>
-              <div class="quote-row">
-                <div class="quote-label">Rush order</div>
-                <div class="quote-value" id="qr-rush">—</div>
-              </div>
-              <div class="quote-row">
-                <div class="quote-label">Estimated volume</div>
-                <div class="quote-value" id="qr-volume">—</div>
-              </div>
-              <div class="quote-row">
-                <div class="quote-label">Estimated weight</div>
-                <div class="quote-value" id="qr-weight">—</div>
               </div>
               <hr style="border:none;border-top:1px dashed #e5e7eb;margin:4px 0;">
               <div class="quote-row">
@@ -542,190 +465,51 @@
                 <div class="quote-value quote-total" id="qr-total">—</div>
               </div>
             </div>
+            </div>
           </div>
-        </div> <!-- /preview-wrapper -->
+        </div> <!-- /quote-wrapper -->
       </div> <!-- /columns -->
     </div> <!-- /shell -->
   </div> <!-- /page -->
 
-  <script>
-    // ===== CONFIG =====
-    // TODO: 换成你线上后端的真实地址，例如：
-    // const API_ENDPOINT = "https://api.iceberg3d.co.uk/api/quote";
-    const API_ENDPOINT = "https://your-backend-domain.com/api/quote";
+    <script>
+    // ===== HELPER FUNCTIONS FOR LOCAL PRICING =====
+    const MATERIAL_MULTIPLIER = {
+      "PLA": 1,
+      "PETG": 1.25,
+      "TPU": 1.35,
+      "PLA-CF": 1.45,
+      "PETG-CF": 1.45,
+      "ASA": 1.4,
+      "ABS": 1.4,
+      "PC/PA": 1.8,
+    };
 
-    // ===== INFILL LABEL =====
-    const infillSlider = document.getElementById("infill");
-    const infillLabel  = document.getElementById("infill-label");
-    infillSlider.addEventListener("input", () => {
-      infillLabel.textContent = infillSlider.value + "%";
-    });
+    const LAYER_MULTIPLIER = {
+      "0.28": 0.85,
+      "0.20": 1,
+      "0.12": 1.4,
+      "0.08": 1.8,
+    };
 
-    // ===== THREE.JS PREVIEW (STL ONLY) =====
-    let scene, camera, renderer, controls;
-    let currentMesh = null;
-    let boxHelper = null;
-    const previewContainer = document.getElementById("preview-canvas");
-    const previewEmpty = document.getElementById("preview-empty");
-    const previewLoading = document.getElementById("preview-loading");
-    const previewMeta = document.getElementById("preview-meta");
-    const previewFilename = document.getElementById("preview-filename");
-    const previewSize = document.getElementById("preview-size");
+    const COLOUR_FEES = {
+      basic: 0,
+      standard: 1.5,
+      metallic: 3,
+      custom: 4,
+    };
 
-    function initPreview() {
-      const width = previewContainer.clientWidth || 320;
-      const height = previewContainer.clientHeight || 260;
+    const BASE_PRICE = 19;
+    const BASE_WEIGHT_G = 50;
+    const EXTRA_RATE_PER_G = 0.2;
 
-      scene = new THREE.Scene();
-      scene.background = null;
-
-      camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
-      camera.position.set(140, 110, 140);
-
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(width, height);
-      renderer.setPixelRatio(window.devicePixelRatio || 1);
-      previewContainer.appendChild(renderer.domElement);
-
-      const keyLight = new THREE.DirectionalLight(0xffffff, 0.95);
-      keyLight.position.set(80, 120, 60);
-      scene.add(keyLight);
-
-      const fillLight = new THREE.DirectionalLight(0xffffff, 0.55);
-      fillLight.position.set(-60, 80, -40);
-      scene.add(fillLight);
-
-      const rimLight = new THREE.DirectionalLight(0xffffff, 0.45);
-      rimLight.position.set(0, 120, -80);
-      scene.add(rimLight);
-
-      const ambient = new THREE.AmbientLight(0xffffff, 0.45);
-      scene.add(ambient);
-
-      const floorGeom = new THREE.CircleGeometry(120, 60);
-      const floorMat = new THREE.MeshPhongMaterial({
-        color: 0xe5e7eb,
-        shininess: 10,
-        specular: 0xf9fafb
-      });
-      const floor = new THREE.Mesh(floorGeom, floorMat);
-      floor.rotation.x = -Math.PI / 2;
-      floor.position.y = -0.01;
-      scene.add(floor);
-
-      controls = new THREE.OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.06;
-      controls.rotateSpeed = 0.85;
-      controls.zoomSpeed = 0.8;
-      controls.panSpeed = 0.6;
-
-      window.addEventListener("resize", onWindowResize);
-      animate();
+    function formatMoney(amount) {
+      return `£ ${amount.toFixed(2)}`;
     }
 
-    function onWindowResize() {
-      if (!renderer) return;
-      const width = previewContainer.clientWidth || 320;
-      const height = previewContainer.clientHeight || 260;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
+    function isStlFile(file) {
+      return file && /\.stl$/i.test(file.name);
     }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      if (controls) controls.update();
-      if (renderer && scene && camera) {
-        renderer.render(scene, camera);
-      }
-    }
-
-    function clearCurrentMesh() {
-      if (currentMesh) {
-        scene.remove(currentMesh);
-        currentMesh.geometry.dispose();
-        currentMesh.material.dispose();
-        currentMesh = null;
-      }
-      if (boxHelper) {
-        scene.remove(boxHelper);
-        boxHelper = null;
-      }
-    }
-
-    function loadSTLFromFile(file) {
-      previewEmpty.style.display = "none";
-      previewLoading.style.display = "flex";
-      previewMeta.style.display = "none";
-
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const arrayBuffer = e.target.result;
-        const loader = new THREE.STLLoader();
-        const geometry = loader.parse(arrayBuffer);
-
-        clearCurrentMesh();
-
-        const material = new THREE.MeshPhongMaterial({
-          color: 0x1d4ed8,
-          specular: 0x93c5fd,
-          shininess: 85
-        });
-        currentMesh = new THREE.Mesh(geometry, material);
-        scene.add(currentMesh);
-
-        geometry.computeBoundingBox();
-        const box = geometry.boundingBox;
-        const size = new THREE.Vector3();
-        box.getSize(size);
-        const center = new THREE.Vector3();
-        box.getCenter(center);
-
-        currentMesh.position.sub(center);
-        currentMesh.position.y -= box.min.y;
-
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const dist = maxDim * 2.2;
-        camera.position.set(dist, dist * 0.8, dist);
-        camera.lookAt(new THREE.Vector3(0, size.y / 2, 0));
-        controls.target.set(0, size.y / 2, 0);
-        controls.update();
-
-        boxHelper = new THREE.Box3Helper(box, 0x9ca3af);
-        scene.add(boxHelper);
-
-        previewFilename.textContent = file.name;
-        previewSize.textContent = `Approx. size: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`;
-        previewMeta.style.display = "flex";
-
-        previewLoading.style.display = "none";
-      };
-
-      reader.onerror = function () {
-        previewLoading.style.display = "none";
-        previewEmpty.style.display = "flex";
-        alert("Failed to read STL file for preview, but you can still request a quote.");
-      };
-
-      reader.readAsArrayBuffer(file);
-    }
-
-    // When file chosen
-    document.getElementById("file").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const ext = file.name.split(".").pop().toLowerCase();
-      if (ext === "stl") {
-        loadSTLFromFile(file);
-      } else {
-        clearCurrentMesh();
-        previewEmpty.style.display = "flex";
-        previewLoading.style.display = "none";
-        previewMeta.style.display = "none";
-      }
-    });
 
     // ===== QUOTE REQUEST HANDLER =====
     const btnQuote = document.getElementById("btn-quote");
@@ -736,12 +520,17 @@
     const quoteEmpty = document.getElementById("quote-empty");
     const quoteResult = document.getElementById("quote-result");
 
-    btnQuote.addEventListener("click", async () => {
+    btnQuote.addEventListener("click", () => {
       formError.textContent = "";
 
       const fileInput = document.getElementById("file");
-      if (!fileInput.files[0]) {
-        formError.textContent = "Please upload at least one 3D model file first.";
+      const file = fileInput.files[0];
+      if (!file) {
+        formError.textContent = "Please upload an STL file first.";
+        return;
+      }
+      if (!isStlFile(file)) {
+        formError.textContent = "Only STL files are accepted for quoting.";
         return;
       }
 
@@ -751,61 +540,46 @@
         return;
       }
 
+      const weight = parseFloat(document.getElementById("weight").value || "0");
+      if (!weight || weight <= 0) {
+        formError.textContent = "Please enter an estimated weight in grams.";
+        return;
+      }
+
       btnQuote.disabled = true;
       btnSpinner.style.display = "inline-block";
       btnLabel.textContent = "Calculating…";
 
-      const formData = new FormData();
-      formData.append("file", fileInput.files[0]);
-      formData.append("material", document.getElementById("material").value);
-      formData.append("layer_height", document.getElementById("layer_height").value);
-      formData.append("infill", String(infillSlider.value));
-      formData.append("quantity", String(quantity));
-      formData.append("rush", document.getElementById("rush").checked ? "true" : "false");
-      formData.append("email", document.getElementById("email").value || "");
-      formData.append("project_name", document.getElementById("project_name").value || "");
-      formData.append("notes", document.getElementById("notes").value || "");
+      const material = document.getElementById("material").value;
+      const colour = document.getElementById("colour").value;
+      const layerHeight = document.getElementById("layer_height").value;
 
-      try {
-        const response = await fetch(API_ENDPOINT, {
-          method: "POST",
-          body: formData,
-        });
+      // Pricing model
+      const materialFactor = MATERIAL_MULTIPLIER[material] || 1;
+      const layerFactor = LAYER_MULTIPLIER[layerHeight] || 1;
+      const colourFee = COLOUR_FEES[colour] ?? 0;
 
-        if (!response.ok) {
-          throw new Error("Server error – please try again or contact us.");
-        }
+      const extraWeight = Math.max(0, weight - BASE_WEIGHT_G);
+      const basePlusWeight = BASE_PRICE + extraWeight * EXTRA_RATE_PER_G;
 
-        const data = await response.json();
-        if (!data.success) {
-          throw new Error(data.error || "Failed to generate quote.");
-        }
+      const pricePerPart = basePlusWeight * materialFactor * layerFactor + colourFee;
+      const total = pricePerPart * quantity;
 
-        const d = data.data;
+      document.getElementById("qr-price-per-part").textContent = formatMoney(pricePerPart);
+      document.getElementById("qr-quantity").textContent = quantity;
+      document.getElementById("qr-material").textContent = material;
+      document.getElementById("qr-colour").textContent = document.getElementById("colour").selectedOptions[0].textContent;
+      document.getElementById("qr-weight").textContent = `${weight} g`;
+      document.getElementById("qr-layer").textContent = `${layerHeight} mm`;
+      document.getElementById("qr-total").textContent = formatMoney(total);
 
-        document.getElementById("qr-price-per-part").textContent = `${d.currency} ${d.price_per_part}`;
-        document.getElementById("qr-quantity").textContent = d.quantity;
-        document.getElementById("qr-material").textContent = d.material;
-        document.getElementById("qr-layer").textContent = `${d.layer_height} mm`;
-        document.getElementById("qr-infill").textContent = `${infillSlider.value}%`;
-        document.getElementById("qr-rush").textContent = d.rush_order ? "Yes" : "No";
-        document.getElementById("qr-volume").textContent = `${d.volume_cm3} cm³`;
-        document.getElementById("qr-weight").textContent = `${d.estimated_weight_g} g`;
-        document.getElementById("qr-total").textContent = `${d.currency} ${d.total_price}`;
+      quoteEmpty.style.display = "none";
+      quoteResult.style.display = "block";
 
-        quoteEmpty.style.display = "none";
-        quoteResult.style.display = "block";
-      } catch (err) {
-        formError.textContent = err.message || "Failed to get quote.";
-      } finally {
-        btnQuote.disabled = false;
-        btnSpinner.style.display = "none";
-        btnLabel.textContent = "Get quote";
-      }
+      btnQuote.disabled = false;
+      btnSpinner.style.display = "none";
+      btnLabel.textContent = "Get quote";
     });
-
-    // init
-    initPreview();
   </script>
 </body>
 </html>
