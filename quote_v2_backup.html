@@ -195,10 +195,6 @@
       font-size: 12px;
     }
 
-    input[type="range"] {
-      width: 100%;
-    }
-
     .checkbox-row {
       display: flex;
       align-items: center;
@@ -310,7 +306,7 @@
       <div class="header">
         <div class="title-block">
           <h1>Iceberg 3D – Custom Printing Quote</h1>
-          <p>Upload your 3D model, pick your settings, and we’ll generate a detailed quote.</p>
+          <p>Upload your STL, pick your settings, and we’ll generate a clear price using our published rule set.</p>
         </div>
         <div class="badge">v2 · Internal Beta</div>
       </div>
@@ -324,7 +320,7 @@
                 <span class="icon">①</span>
                 Project &amp; Print Settings
               </div>
-              <div class="card-sub">Tell us what you’re printing – we’ll use this to calculate time &amp; material.</div>
+              <div class="card-sub">Upload STL, choose material/colour/layer height, then calculate price.</div>
             </div>
           </div>
 
@@ -333,7 +329,7 @@
               3D model file
               <small>Supported: STL, 3MF, OBJ (preview for STL/OBJ/3MF)</small>
             </label>
-            <input id="file" type="file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ" />
+            <input id="file" type="file" accept=".stl,.STL" />
             <div class="hint">If you have multiple parts, please zip them and upload as one file – we’ll treat this as one project.</div>
           </div>
 
@@ -341,13 +337,17 @@
             <div class="field">
               <label>
                 Material
-                <small>PLA / PETG priced for standard jobs</small>
+                <small>Uses published multipliers</small>
               </label>
               <select id="material">
-                <option value="PLA" selected>PLA (standard)</option>
-                <option value="PETG">PETG (stronger)</option>
-                <option value="ASA">ASA (outdoor)</option>
-                <option value="TPU">TPU (flexible)</option>
+                <option value="PLA" selected>PLA (1.0x baseline)</option>
+                <option value="PETG">PETG (1.25x)</option>
+                <option value="TPU">TPU (1.35x)</option>
+                <option value="PLA-CF">PLA-CF (1.45x)</option>
+                <option value="PETG-CF">PETG-CF (1.45x)</option>
+                <option value="ASA">ASA (1.4x)</option>
+                <option value="ABS">ABS (1.4x)</option>
+                <option value="PC/PA">PC / PA (1.8x)</option>
               </select>
             </div>
 
@@ -357,32 +357,40 @@
                 <small>Smaller = finer detail</small>
               </label>
               <select id="layer_height">
-                <option value="0.12">0.12 mm – Fine</option>
-                <option value="0.16" selected>0.16 mm – Balanced</option>
-                <option value="0.20">0.20 mm – Standard</option>
-                <option value="0.28">0.28 mm – Draft</option>
+                <option value="0.28">0.28 mm – Quick (0.85x)</option>
+                <option value="0.20" selected>0.20 mm – Standard (1.0x)</option>
+                <option value="0.12">0.12 mm – High detail (1.4x)</option>
+                <option value="0.08">0.08 mm – Ultra fine (1.8x)</option>
               </select>
             </div>
 
             <div class="field">
               <label>
-                Infill
-                <small id="infill-label">20%</small>
+                Colour
+                <small>Black/White no surcharge</small>
               </label>
-              <input id="infill" type="range" min="10" max="100" step="5" value="20" />
+              <select id="colour">
+                <option value="basic" selected>Black / White (£0)</option>
+                <option value="standard">Standard colours (+£1.50)</option>
+                <option value="metallic">Metallic / Silk (+£3.00)</option>
+                <option value="custom">Special-order colour (+£4.00 est.)</option>
+              </select>
             </div>
 
             <div class="field">
               <label>
-                Quantity
+                Estimated weight (g)
+                <small>Enter slicer-estimated weight</small>
               </label>
-              <input id="quantity" type="number" min="1" value="1" />
+              <input id="weight" type="number" min="1" value="50" />
             </div>
           </div>
 
-          <div class="checkbox-row">
-            <input id="rush" type="checkbox" />
-            <label for="rush">Rush order (we’ll prioritise this job, surcharge applies)</label>
+          <div class="field" style="margin-top: 8px;">
+            <label>
+              Quantity
+            </label>
+            <input id="quantity" type="number" min="1" value="1" />
           </div>
 
           <div class="field-grid" style="margin-top: 8px;">
@@ -398,7 +406,7 @@
 
           <div class="field" style="margin-top: 6px;">
             <label>Notes for Iceberg team (optional)</label>
-            <textarea id="notes" placeholder="Tell us about colour preferences, use case, deadlines, or anything special."></textarea>
+            <textarea id="notes" placeholder="Tell us about deadlines, tolerances, colour requests, or anything special."></textarea>
           </div>
 
           <div id="form-error" class="error"></div>
@@ -460,12 +468,8 @@
                 <div class="quote-value" id="qr-material">—</div>
               </div>
               <div class="quote-row">
-                <div class="quote-label">Layer height</div>
-                <div class="quote-value" id="qr-layer">—</div>
-              </div>
-              <div class="quote-row">
-                <div class="quote-label">Infill</div>
-                <div class="quote-value" id="qr-infill">—</div>
+                <div class="quote-label">Colour</div>
+                <div class="quote-value" id="qr-colour">—</div>
               </div>
               <div class="quote-row">
                 <div class="quote-label">Rush order</div>
@@ -748,6 +752,12 @@
       const quantity = parseInt(document.getElementById("quantity").value || "1", 10);
       if (!quantity || quantity < 1) {
         formError.textContent = "Quantity must be at least 1.";
+        return;
+      }
+
+      const weight = parseFloat(document.getElementById("weight").value || "0");
+      if (!weight || weight <= 0) {
+        formError.textContent = "Please enter an estimated weight in grams.";
         return;
       }
 
