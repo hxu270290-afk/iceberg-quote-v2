@@ -9,6 +9,9 @@
   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
   <script src="https://unpkg.com/three@0.152.2/examples/js/loaders/STLLoader.js"></script>
+  <script src="https://unpkg.com/three@0.152.2/examples/js/loaders/OBJLoader.js"></script>
+  <script src="https://unpkg.com/three@0.152.2/examples/js/libs/fflate.min.js"></script>
+  <script src="https://unpkg.com/three@0.152.2/examples/js/loaders/3MFLoader.js"></script>
 
   <style>
     * { box-sizing: border-box; }
@@ -383,7 +386,7 @@
           <div class="field field-file">
             <label>
               3D model file
-              <small>Supported: STL, 3MF, OBJ (preview for STL only)</small>
+              <small>Supported: STL, 3MF, OBJ (preview for STL/OBJ/3MF)</small>
             </label>
             <input id="file" type="file" accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ" />
             <div class="hint">If you have multiple parts, please zip them and upload as one file – we’ll treat this as one project.</div>
@@ -472,7 +475,7 @@
                   <span class="icon">②</span>
                   Model preview
                 </div>
-                <div class="card-sub">Rotate, pan and zoom – for STL files only. Other formats are still printable.</div>
+                <div class="card-sub">Rotate, pan and zoom – works for STL, OBJ and 3MF uploads.</div>
               </div>
             </div>
 
@@ -480,7 +483,7 @@
               <div id="preview-canvas"></div>
               <div id="preview-empty" class="preview-empty">
                 <div>No model loaded yet</div>
-                <div class="hint">Upload an STL file to see an interactive preview.</div>
+              <div class="hint">Upload an STL/OBJ/3MF file to see an interactive preview.</div>
               </div>
               <div id="preview-loading" class="preview-loading" style="display:none;">
                 <div class="spinner" style="border-color:rgba(37,99,235,0.25);border-top-color:#2563eb;"></div>
@@ -561,9 +564,9 @@
       infillLabel.textContent = infillSlider.value + "%";
     });
 
-    // ===== THREE.JS PREVIEW (STL ONLY) =====
+    // ===== THREE.JS PREVIEW (STL / OBJ / 3MF) =====
     let scene, camera, renderer, controls;
-    let currentMesh = null;
+    let currentObject = null;
     let boxHelper = null;
     const previewContainer = document.getElementById("preview-canvas");
     const previewEmpty = document.getElementById("preview-empty");
@@ -641,12 +644,25 @@
       }
     }
 
-    function clearCurrentMesh() {
-      if (currentMesh) {
-        scene.remove(currentMesh);
-        currentMesh.geometry.dispose();
-        currentMesh.material.dispose();
-        currentMesh = null;
+    function disposeObject(object) {
+      if (!object) return;
+      object.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry?.dispose?.();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m?.dispose?.());
+          } else {
+            child.material?.dispose?.();
+          }
+        }
+      });
+    }
+
+    function clearCurrentObject() {
+      if (currentObject) {
+        disposeObject(currentObject);
+        scene.remove(currentObject);
+        currentObject = null;
       }
       if (boxHelper) {
         scene.remove(boxHelper);
@@ -654,77 +670,132 @@
       }
     }
 
-    function loadSTLFromFile(file) {
+    function centerAndFocus(object, fileName) {
+      clearCurrentObject();
+      currentObject = object;
+      scene.add(currentObject);
+
+      const box = new THREE.Box3().setFromObject(currentObject);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+
+      currentObject.position.sub(center);
+      currentObject.position.y -= box.min.y;
+
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const dist = maxDim * 2.4;
+      camera.position.set(dist, dist * 0.8, dist);
+      camera.lookAt(new THREE.Vector3(0, size.y / 2, 0));
+      controls.target.set(0, size.y / 2, 0);
+      controls.update();
+
+      boxHelper = new THREE.Box3Helper(box, 0x9ca3af);
+      scene.add(boxHelper);
+
+      previewFilename.textContent = fileName;
+      previewSize.textContent = `Approx. size: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`;
+      previewMeta.style.display = "flex";
+    }
+
+    function prepareObjectMaterials(object) {
+      object.traverse((child) => {
+        if (child.isMesh) {
+          if (!child.material) {
+            child.material = new THREE.MeshPhongMaterial({ color: 0x1d4ed8, specular: 0x93c5fd, shininess: 85 });
+          } else if (!child.material.isMeshPhongMaterial) {
+            child.material = new THREE.MeshPhongMaterial({
+              color: child.material.color || new THREE.Color(0x1d4ed8),
+              shininess: 70,
+            });
+          }
+        }
+      });
+    }
+
+    function showLoading() {
       previewEmpty.style.display = "none";
       previewLoading.style.display = "flex";
       previewMeta.style.display = "none";
+    }
 
-      const reader = new FileReader();
-      reader.onload = function (e) {
-        const arrayBuffer = e.target.result;
-        const loader = new THREE.STLLoader();
-        const geometry = loader.parse(arrayBuffer);
+    function handleLoadError(message) {
+      clearCurrentObject();
+      previewLoading.style.display = "none";
+      previewEmpty.style.display = "flex";
+      alert(message || "Failed to read file for preview, but you can still request a quote.");
+    }
 
-        clearCurrentMesh();
+    function loadModelFromFile(file) {
+      const ext = file.name.split(".").pop().toLowerCase();
+      showLoading();
 
-        const material = new THREE.MeshPhongMaterial({
-          color: 0x1d4ed8,
-          specular: 0x93c5fd,
-          shininess: 85
-        });
-        currentMesh = new THREE.Mesh(geometry, material);
-        scene.add(currentMesh);
+      if (ext === "stl") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const loader = new THREE.STLLoader();
+            const geometry = loader.parse(e.target.result);
+            const mesh = new THREE.Mesh(
+              geometry,
+              new THREE.MeshPhongMaterial({ color: 0x1d4ed8, specular: 0x93c5fd, shininess: 85 })
+            );
+            centerAndFocus(mesh, file.name);
+            previewLoading.style.display = "none";
+          } catch (err) {
+            handleLoadError("Failed to parse STL file for preview.");
+          }
+        };
+        reader.onerror = () => handleLoadError();
+        reader.readAsArrayBuffer(file);
+        return;
+      }
 
-        geometry.computeBoundingBox();
-        const box = geometry.boundingBox;
-        const size = new THREE.Vector3();
-        box.getSize(size);
-        const center = new THREE.Vector3();
-        box.getCenter(center);
+      if (ext === "obj") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const loader = new THREE.OBJLoader();
+            const object = loader.parse(e.target.result);
+            prepareObjectMaterials(object);
+            centerAndFocus(object, file.name);
+            previewLoading.style.display = "none";
+          } catch (err) {
+            handleLoadError("Failed to parse OBJ file for preview.");
+          }
+        };
+        reader.onerror = () => handleLoadError();
+        reader.readAsText(file);
+        return;
+      }
 
-        currentMesh.position.sub(center);
-        currentMesh.position.y -= box.min.y;
+      if (ext === "3mf") {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const loader = new THREE.ThreeMFLoader();
+            const object = loader.parse(e.target.result);
+            prepareObjectMaterials(object);
+            centerAndFocus(object, file.name);
+            previewLoading.style.display = "none";
+          } catch (err) {
+            handleLoadError("Failed to parse 3MF file for preview.");
+          }
+        };
+        reader.onerror = () => handleLoadError();
+        reader.readAsArrayBuffer(file);
+        return;
+      }
 
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const dist = maxDim * 2.2;
-        camera.position.set(dist, dist * 0.8, dist);
-        camera.lookAt(new THREE.Vector3(0, size.y / 2, 0));
-        controls.target.set(0, size.y / 2, 0);
-        controls.update();
-
-        boxHelper = new THREE.Box3Helper(box, 0x9ca3af);
-        scene.add(boxHelper);
-
-        previewFilename.textContent = file.name;
-        previewSize.textContent = `Approx. size: ${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`;
-        previewMeta.style.display = "flex";
-
-        previewLoading.style.display = "none";
-      };
-
-      reader.onerror = function () {
-        previewLoading.style.display = "none";
-        previewEmpty.style.display = "flex";
-        alert("Failed to read STL file for preview, but you can still request a quote.");
-      };
-
-      reader.readAsArrayBuffer(file);
+      handleLoadError("Unsupported file type for preview. Please upload STL, OBJ or 3MF.");
     }
 
     // When file chosen
     document.getElementById("file").addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
-
-      const ext = file.name.split(".").pop().toLowerCase();
-      if (ext === "stl") {
-        loadSTLFromFile(file);
-      } else {
-        clearCurrentMesh();
-        previewEmpty.style.display = "flex";
-        previewLoading.style.display = "none";
-        previewMeta.style.display = "none";
-      }
+      loadModelFromFile(file);
     });
 
     // ===== QUOTE REQUEST HANDLER =====
